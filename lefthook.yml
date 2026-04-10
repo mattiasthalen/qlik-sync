@@ -10,6 +10,15 @@ pre-commit:
             git add "$dir/.gitkeep"
           fi
         done
+    go-vet:
+      glob: "*.go"
+      run: go vet ./...
+    go-lint:
+      glob: "*.go"
+      run: golangci-lint run
+    go-test:
+      glob: "*.go"
+      run: go test ./...
 
 commit-msg:
   commands:
