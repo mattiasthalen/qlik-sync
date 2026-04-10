@@ -1,0 +1,15 @@
+[
+  {
+    "resourceId": "app-001",
+    "name": "Sales Dashboard",
+    "resourceType": "app",
+    "spaceId": "space-001",
+    "ownerId": "user-001",
+    "description": "Test app",
+    "resourceAttributes": {
+      "usage": "ANALYTICS",
+      "lastReloadTime": "2026-04-08T02:00:00Z"
+    },
+    "resourceCreatedAt": "2026-01-01T00:00:00Z"
+  }
+]
