@@ -134,7 +134,7 @@ On-prem omits the `<appType>/` level and uses `<hostname>/` instead of `<tenant>
 ```
 qs setup
     │
-    ├─ check prerequisites (qlik-cli, jq in PATH)
+    ├─ check prerequisites (qlik-cli in PATH)
     │   └─ missing → print install instructions with URLs, exit 1
     ├─ list existing qlik contexts: qlik context ls
     ├─ prompt: select existing context or create new
@@ -301,7 +301,6 @@ Ruleset on `main`:
 ### Hard (v1)
 
 - `qlik-cli` — API access via shell exec
-- `jq` — JSON processing (evaluate if still needed with Go JSON handling)
 
 ### Soft (v1)
 
@@ -310,7 +309,6 @@ Ruleset on `main`:
 ### Removed (v2)
 
 - `qlik-cli` — replaced by direct REST API calls
-- `jq` — unnecessary with native Go JSON
 
 ## Migration Path
 
