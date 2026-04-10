@@ -113,3 +113,27 @@ func DetectTenantType(server string) string {
 	}
 	return "on-prem"
 }
+
+func Resolve(cfg *Config, flagThreads, flagRetries *int) *Config {
+	out := WithDefaults(cfg)
+	if flagThreads != nil {
+		out.Threads = *flagThreads
+	}
+	if flagRetries != nil {
+		out.Retries = *flagRetries
+	}
+	return out
+}
+
+func FilterTenants(tenants []Tenant, context string) []Tenant {
+	if context == "" {
+		return tenants
+	}
+	var filtered []Tenant
+	for _, t := range tenants {
+		if t.Context == context {
+			filtered = append(filtered, t)
+		}
+	}
+	return filtered
+}

@@ -150,3 +150,54 @@ func TestDetectTenantType(t *testing.T) {
 		}
 	}
 }
+
+func TestResolve(t *testing.T) {
+	cfg := &config.Config{
+		Version: "0.2.0",
+		Threads: 10,
+		Retries: 5,
+		Tenants: []config.Tenant{
+			{Context: "a", Server: "https://a.qlikcloud.com", Type: "cloud"},
+			{Context: "b", Server: "https://b.corp.local", Type: "on-prem"},
+		},
+	}
+
+	t.Run("flag overrides config", func(t *testing.T) {
+		flagThreads := 20
+		flagRetries := 1
+		resolved := config.Resolve(cfg, &flagThreads, &flagRetries)
+		if resolved.Threads != 20 {
+			t.Errorf("threads = %d, want 20", resolved.Threads)
+		}
+		if resolved.Retries != 1 {
+			t.Errorf("retries = %d, want 1", resolved.Retries)
+		}
+	})
+
+	t.Run("nil flags use config values", func(t *testing.T) {
+		resolved := config.Resolve(cfg, nil, nil)
+		if resolved.Threads != 10 {
+			t.Errorf("threads = %d, want 10", resolved.Threads)
+		}
+		if resolved.Retries != 5 {
+			t.Errorf("retries = %d, want 5", resolved.Retries)
+		}
+	})
+
+	t.Run("filter tenants by context", func(t *testing.T) {
+		tenants := config.FilterTenants(cfg.Tenants, "a")
+		if len(tenants) != 1 {
+			t.Fatalf("filtered count = %d, want 1", len(tenants))
+		}
+		if tenants[0].Context != "a" {
+			t.Errorf("context = %q, want %q", tenants[0].Context, "a")
+		}
+	})
+
+	t.Run("empty filter returns all tenants", func(t *testing.T) {
+		tenants := config.FilterTenants(cfg.Tenants, "")
+		if len(tenants) != 2 {
+			t.Fatalf("filtered count = %d, want 2", len(tenants))
+		}
+	})
+}
