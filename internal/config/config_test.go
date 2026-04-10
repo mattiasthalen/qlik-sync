@@ -59,3 +59,94 @@ func TestRead_MissingFile(t *testing.T) {
 		t.Fatal("expected error for missing config, got nil")
 	}
 }
+
+func TestWrite(t *testing.T) {
+	dir := t.TempDir()
+	cfg := &config.Config{
+		Version: "0.2.0",
+		Threads: 5,
+		Retries: 3,
+		Tenants: []config.Tenant{
+			{Context: "test", Server: "https://test.qlikcloud.com", Type: "cloud"},
+		},
+	}
+
+	if err := config.Write(dir, cfg); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, err := config.Read(dir)
+	if err != nil {
+		t.Fatalf("read back failed: %v", err)
+	}
+	if got.Tenants[0].Context != "test" {
+		t.Errorf("context = %q, want %q", got.Tenants[0].Context, "test")
+	}
+}
+
+func TestDefaults(t *testing.T) {
+	dir := t.TempDir()
+	data := `{"version": "0.2.0", "tenants": []}`
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(data), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Read(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	resolved := config.WithDefaults(cfg)
+	if resolved.Threads != 5 {
+		t.Errorf("default threads = %d, want 5", resolved.Threads)
+	}
+	if resolved.Retries != 3 {
+		t.Errorf("default retries = %d, want 3", resolved.Retries)
+	}
+}
+
+func TestRead_V010Migration(t *testing.T) {
+	dir := t.TempDir()
+	data := `{
+		"context": "legacy-tenant",
+		"server": "https://legacy.qlikcloud.com",
+		"lastSync": "2026-01-01T00:00:00Z"
+	}`
+	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(data), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg, err := config.Read(dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.Version != "0.2.0" {
+		t.Errorf("migrated version = %q, want %q", cfg.Version, "0.2.0")
+	}
+	if len(cfg.Tenants) != 1 {
+		t.Fatalf("migrated tenants count = %d, want 1", len(cfg.Tenants))
+	}
+	if cfg.Tenants[0].Context != "legacy-tenant" {
+		t.Errorf("migrated context = %q, want %q", cfg.Tenants[0].Context, "legacy-tenant")
+	}
+	if cfg.Tenants[0].Type != "cloud" {
+		t.Errorf("migrated type = %q, want %q", cfg.Tenants[0].Type, "cloud")
+	}
+}
+
+func TestDetectTenantType(t *testing.T) {
+	tests := []struct {
+		server string
+		want   string
+	}{
+		{"https://tenant.qlikcloud.com", "cloud"},
+		{"https://qlik.corp.local/jwt", "on-prem"},
+		{"https://us.qlikcloud.com", "cloud"},
+	}
+	for _, tt := range tests {
+		got := config.DetectTenantType(tt.server)
+		if got != tt.want {
+			t.Errorf("DetectTenantType(%q) = %q, want %q", tt.server, got, tt.want)
+		}
+	}
+}
