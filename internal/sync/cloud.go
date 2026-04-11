@@ -51,6 +51,7 @@ type cloudApp struct {
 	SpaceID            string             `json:"spaceId"`
 	OwnerID            string             `json:"ownerId"`
 	Description        string             `json:"description"`
+	TenantID           string             `json:"tenantId"`
 	ResourceAttributes cloudAppAttributes `json:"resourceAttributes"`
 }
 
@@ -66,18 +67,33 @@ func ParseCloudApps(data []byte, spaces map[string]SpaceInfo, tenant, tenantID s
 	for _, r := range raw {
 		space := spaces[r.SpaceID]
 		appType := NormalizeAppType(r.ResourceAttributes.Usage)
+
+		// Use tenantId from API response if available, fall back to provided value
+		tid := tenantID
+		if r.TenantID != "" {
+			tid = r.TenantID
+		}
+
+		// Handle personal space (no spaceId)
+		spaceName := space.Name
+		spaceType := space.Type
+		if r.SpaceID == "" {
+			spaceName = "personal"
+			spaceType = "personal"
+		}
+
 		a := App{
 			ResourceID:     r.ResourceID,
 			Name:           r.Name,
 			SpaceID:        r.SpaceID,
-			SpaceName:      space.Name,
-			SpaceType:      space.Type,
+			SpaceName:      spaceName,
+			SpaceType:      spaceType,
 			AppType:        appType,
 			OwnerID:        r.OwnerID,
 			Description:    r.Description,
 			LastReloadTime: r.ResourceAttributes.LastReloadTime,
 			Tenant:         tenant,
-			TenantID:       tenantID,
+			TenantID:       tid,
 		}
 		a.TargetPath = BuildTargetPath(a)
 		apps = append(apps, a)

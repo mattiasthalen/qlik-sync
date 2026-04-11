@@ -64,3 +64,45 @@ func TestParseCloudApps(t *testing.T) {
 		t.Errorf("appType = %q, want analytics", app.AppType)
 	}
 }
+
+func TestParseCloudApps_TenantIDFromAPI(t *testing.T) {
+	spacesData, _ := os.ReadFile("../../testdata/cloud/spaces.json")
+	spaces, _ := sync.ParseCloudSpaces(spacesData)
+
+	appsJSON := `[{
+		"resourceId": "app-001", "name": "Test",
+		"spaceId": "space-001", "ownerId": "user-001",
+		"tenantId": "from-api-123",
+		"resourceAttributes": {"usage": "ANALYTICS"}
+	}]`
+
+	apps, err := sync.ParseCloudApps([]byte(appsJSON), spaces, "my-tenant", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if apps[0].TenantID != "from-api-123" {
+		t.Errorf("tenantID = %q, want %q", apps[0].TenantID, "from-api-123")
+	}
+}
+
+func TestParseCloudApps_PersonalSpace(t *testing.T) {
+	spaces := make(map[string]sync.SpaceInfo)
+
+	appsJSON := `[{
+		"resourceId": "app-001", "name": "My Personal App",
+		"spaceId": "", "ownerId": "user-001",
+		"tenantId": "tid-123",
+		"resourceAttributes": {"usage": "ANALYTICS"}
+	}]`
+
+	apps, err := sync.ParseCloudApps([]byte(appsJSON), spaces, "my-tenant", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if apps[0].SpaceName != "personal" {
+		t.Errorf("spaceName = %q, want %q", apps[0].SpaceName, "personal")
+	}
+	if apps[0].SpaceType != "personal" {
+		t.Errorf("spaceType = %q, want %q", apps[0].SpaceType, "personal")
+	}
+}
