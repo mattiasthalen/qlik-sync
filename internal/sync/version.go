@@ -39,3 +39,18 @@ func ParseVersion(raw string) (major, minor, patch int, err error) {
 
 	return major, minor, patch, nil
 }
+
+// CheckVersion validates that qlik version output is within compatible range.
+// Compatible range: major == 3, minor == 0, any patch.
+func CheckVersion(raw string) error {
+	major, minor, patch, err := ParseVersion(raw)
+	if err != nil {
+		return fmt.Errorf("cannot determine qlik-cli version: %w", err)
+	}
+
+	if major != 3 || minor != 0 {
+		return fmt.Errorf("qlik-cli version %d.%d.%d is not compatible; requires >= 3.0.0, < 3.1.0", major, minor, patch)
+	}
+
+	return nil
+}
