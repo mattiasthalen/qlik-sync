@@ -48,7 +48,7 @@ func init() {
 const cacheTTL = 5 * time.Minute
 
 func runSync(cmd *cobra.Command, args []string) error {
-	if err := qsync.CheckPrerequisites(); err != nil {
+	if err := qsync.CheckPrerequisites(skipVersionCheck); err != nil {
 		return err
 	}
 
