@@ -24,7 +24,7 @@ func init() {
 }
 
 func runSetup(cmd *cobra.Command, args []string) error {
-	if err := qsync.CheckPrerequisites(); err != nil {
+	if err := qsync.CheckPrerequisites(skipVersionCheck); err != nil {
 		return err
 	}
 

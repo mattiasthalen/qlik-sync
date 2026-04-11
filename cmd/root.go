@@ -6,8 +6,9 @@ import (
 )
 
 var (
-	logLevel  string
-	configDir string
+	logLevel         string
+	configDir        string
+	skipVersionCheck bool
 )
 
 var rootCmd = &cobra.Command{
@@ -23,4 +24,5 @@ func Execute() error {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "disabled", "log level (debug|info|warn|error|disabled)")
 	rootCmd.PersistentFlags().StringVar(&configDir, "config", "qlik", "config and sync directory")
+	rootCmd.PersistentFlags().BoolVar(&skipVersionCheck, "skip-version-check", false, "skip qlik-cli version compatibility check")
 }

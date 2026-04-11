@@ -4,13 +4,25 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
-func CheckPrerequisites() error {
-	if _, err := exec.LookPath("qlik"); err != nil {
+func CheckPrerequisites(skipVersionCheck bool) error {
+	binary, err := exec.LookPath("qlik")
+	if err != nil {
 		return fmt.Errorf("qlik-cli not found in PATH\n  Install: https://qlik.dev/toolkits/qlik-cli/")
 	}
-	return nil
+
+	if skipVersionCheck {
+		return nil
+	}
+
+	out, err := RunQlikCmd(context.Background(), binary, "version")
+	if err != nil {
+		return fmt.Errorf("cannot determine qlik-cli version: %w", err)
+	}
+
+	return CheckVersion(strings.TrimSpace(string(out)))
 }
 
 func RunQlikCmd(ctx context.Context, binary string, args ...string) ([]byte, error) {
