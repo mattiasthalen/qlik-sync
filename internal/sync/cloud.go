@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 )
@@ -99,4 +100,40 @@ func ParseCloudApps(data []byte, spaces map[string]SpaceInfo, tenant, tenantID s
 		apps = append(apps, a)
 	}
 	return apps, nil
+}
+
+// ResolveOwnerNames looks up user names for personal space apps and updates
+// SpaceName to "ownerName (ownerId)" and rebuilds TargetPath. Uses a cache
+// to avoid redundant lookups.
+func ResolveOwnerNames(ctx context.Context, apps []App, qlikBinary string) []App {
+	cache := make(map[string]string)
+	for i := range apps {
+		if apps[i].SpaceID != "" {
+			continue
+		}
+		ownerID := apps[i].OwnerID
+		name, ok := cache[ownerID]
+		if !ok {
+			name = lookupUserName(ctx, qlikBinary, ownerID)
+			cache[ownerID] = name
+		}
+		apps[i].OwnerName = name
+		apps[i].SpaceName = name
+		apps[i].TargetPath = BuildTargetPath(apps[i])
+	}
+	return apps
+}
+
+func lookupUserName(ctx context.Context, binary, userID string) string {
+	out, err := RunQlikCmd(ctx, binary, "user", "get", userID, "--json")
+	if err != nil {
+		return userID
+	}
+	var user struct {
+		Name string `json:"name"`
+	}
+	if json.Unmarshal(out, &user) != nil || user.Name == "" {
+		return userID
+	}
+	return user.Name
 }

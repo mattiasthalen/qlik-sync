@@ -100,6 +100,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 			exitCode = 2; continue
 		}
 
+		apps = qsync.ResolveOwnerNames(ctx, apps, "qlik")
 		apps = qsync.ApplyFilters(apps, filters)
 		if syncForce {
 			apps = qsync.MarkSkippedForce(apps)

@@ -98,4 +98,21 @@ func TestBuildTargetPath(t *testing.T) {
 	if got2 != want2 {
 		t.Errorf("BuildTargetPath without appType: got %q, want %q", got2, want2)
 	}
+
+	personalApp := App{
+		ResourceID: "r3",
+		Name:       "My App",
+		SpaceID:    "",
+		SpaceName:  "Jane Doe",
+		SpaceType:  "personal",
+		AppType:    "analytics",
+		OwnerID:    "user-001",
+		Tenant:     "mytenant",
+		TenantID:   "tid1",
+	}
+	got3 := BuildTargetPath(personalApp)
+	want3 := "mytenant (tid1)/personal/Jane Doe (user-001)/analytics/My App (r3)"
+	if got3 != want3 {
+		t.Errorf("BuildTargetPath personal: got %q, want %q", got3, want3)
+	}
 }

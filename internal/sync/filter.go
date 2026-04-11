@@ -73,11 +73,23 @@ func Sanitize(name string) string {
 
 // BuildTargetPath builds the target path for an app.
 // Format: tenant (tenantId)/spaceType/spaceName (spaceId)/appType/appName (resourceId)
+// For personal space: tenant (tenantId)/personal/ownerName (ownerId)/appType/appName (resourceId)
 // The appType level is omitted when AppType is empty.
 func BuildTargetPath(app App) string {
 	tenant := fmt.Sprintf("%s (%s)", Sanitize(app.Tenant), Sanitize(app.TenantID))
-	space := fmt.Sprintf("%s (%s)", Sanitize(app.SpaceName), Sanitize(app.SpaceID))
 	appName := fmt.Sprintf("%s (%s)", Sanitize(app.Name), Sanitize(app.ResourceID))
+
+	var space string
+	if app.SpaceID == "" {
+		// Personal space: use owner name and ID
+		ownerName := app.SpaceName
+		if ownerName == "" || ownerName == "personal" {
+			ownerName = app.OwnerID
+		}
+		space = fmt.Sprintf("%s (%s)", Sanitize(ownerName), Sanitize(app.OwnerID))
+	} else {
+		space = fmt.Sprintf("%s (%s)", Sanitize(app.SpaceName), Sanitize(app.SpaceID))
+	}
 
 	if app.AppType == "" {
 		return fmt.Sprintf("%s/%s/%s/%s", tenant, Sanitize(app.SpaceType), space, appName)
