@@ -18,9 +18,19 @@ func TestFilterBySpace(t *testing.T) {
 }
 
 func TestFilterByApp(t *testing.T) {
-	result := FilterByApp(testApps, "Sales")
+	result, err := FilterByApp(testApps, "Sales")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(result) != 2 {
 		t.Errorf("expected 2 apps, got %d", len(result))
+	}
+}
+
+func TestFilterByApp_InvalidRegex(t *testing.T) {
+	_, err := FilterByApp(testApps, "[invalid")
+	if err == nil {
+		t.Error("expected error for invalid regex")
 	}
 }
 
@@ -40,7 +50,10 @@ func TestFilterByID(t *testing.T) {
 
 func TestApplyFilters(t *testing.T) {
 	f := Filters{Space: "Finance", App: "Pipeline"}
-	result := ApplyFilters(testApps, f)
+	result, err := ApplyFilters(testApps, f)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(result) != 1 {
 		t.Errorf("expected 1 app, got %d", len(result))
 	}

@@ -8,9 +8,21 @@ import (
 )
 
 // BuildIndex constructs an Index from a PrepOutput and the sync results.
+// Only apps with status "synced" or "skipped" are included; errored apps are excluded.
 func BuildIndex(prep PrepOutput, results []Result) Index {
+	// Build set of non-errored app IDs
+	okIDs := make(map[string]bool, len(results))
+	for _, r := range results {
+		if r.Status == "synced" || r.Status == "skipped" {
+			okIDs[r.ResourceID] = true
+		}
+	}
+
 	apps := make(map[string]IndexEntry, len(prep.Apps))
 	for _, a := range prep.Apps {
+		if !okIDs[a.ResourceID] {
+			continue
+		}
 		apps[a.ResourceID] = IndexEntry{
 			Name:           a.Name,
 			Space:          a.SpaceName,

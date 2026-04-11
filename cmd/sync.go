@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/mattiasthalen/qlik-sync/internal/config"
 	qsync "github.com/mattiasthalen/qlik-sync/internal/sync"
@@ -20,6 +22,9 @@ var (
 	syncThreads int
 	syncRetries int
 )
+
+// ErrPartialSync indicates some apps failed to sync.
+var ErrPartialSync = fmt.Errorf("partial sync failure")
 
 var syncCmd = &cobra.Command{
 	Use:   "sync",
@@ -40,6 +45,8 @@ func init() {
 	rootCmd.AddCommand(syncCmd)
 }
 
+const cacheTTL = 5 * time.Minute
+
 func runSync(cmd *cobra.Command, args []string) error {
 	if err := qsync.CheckPrerequisites(); err != nil {
 		return err
@@ -51,8 +58,12 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 
 	var flagThreads, flagRetries *int
-	if cmd.Flags().Changed("threads") { flagThreads = &syncThreads }
-	if cmd.Flags().Changed("retries") { flagRetries = &syncRetries }
+	if cmd.Flags().Changed("threads") {
+		flagThreads = &syncThreads
+	}
+	if cmd.Flags().Changed("retries") {
+		flagRetries = &syncRetries
+	}
 	resolved := config.Resolve(cfg, flagThreads, flagRetries)
 
 	tenants := config.FilterTenants(resolved.Tenants, syncTenant)
@@ -63,45 +74,29 @@ func runSync(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	filters := qsync.Filters{Space: syncSpace, Stream: syncStream, App: syncApp, ID: syncID}
 
-	exitCode := 0
+	hadErrors := false
 	for _, tenant := range tenants {
 		if tenant.Type != "cloud" {
 			fmt.Fprintf(os.Stderr, "Skipping on-prem tenant %q (not yet supported)\n", tenant.Context)
 			continue
 		}
 
-		spacesOut, err := qsync.RunQlikCmd(ctx, "qlik", qsync.BuildSpaceListArgs()...)
+		apps, spaces, err := prepTenant(ctx, tenant, filters)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error fetching spaces for %q: %v\n", tenant.Context, err)
-			exitCode = 2; continue
-		}
-		spaces, err := qsync.ParseCloudSpaces(spacesOut)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing spaces for %q: %v\n", tenant.Context, err)
-			exitCode = 2; continue
+			fmt.Fprintf(os.Stderr, "Error preparing %q: %v\n", tenant.Context, err)
+			hadErrors = true
+			continue
 		}
 
-		spaceID := ""
-		if syncSpace != "" {
-			for _, s := range spaces {
-				if s.Name == syncSpace { spaceID = s.ID; break }
-			}
-		}
-
-		appsOut, err := qsync.RunQlikCmd(ctx, "qlik", qsync.BuildAppListArgs(spaceID)...)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error fetching apps for %q: %v\n", tenant.Context, err)
-			exitCode = 2; continue
-		}
-
-		apps, err := qsync.ParseCloudApps(appsOut, spaces, tenant.Context, "")
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error parsing apps for %q: %v\n", tenant.Context, err)
-			exitCode = 2; continue
-		}
+		_ = spaces // used during prep
 
 		apps = qsync.ResolveOwnerNames(ctx, apps, "qlik")
-		apps = qsync.ApplyFilters(apps, filters)
+
+		apps, err = qsync.ApplyFilters(apps, filters)
+		if err != nil {
+			return err
+		}
+
 		if syncForce {
 			apps = qsync.MarkSkippedForce(apps)
 		} else {
@@ -120,11 +115,70 @@ func runSync(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(os.Stderr, "Error writing index: %v\n", err)
 		}
 
-		synced, skipped, errors := qsync.Summarize(results)
-		fmt.Printf("%d synced, %d skipped, %d errors\n", synced, skipped, errors)
-		if errors > 0 { exitCode = 2 }
+		synced, skipped, syncErrors := qsync.Summarize(results)
+		fmt.Printf("%d synced, %d skipped, %d errors\n", synced, skipped, syncErrors)
+		if syncErrors > 0 {
+			hadErrors = true
+		}
 	}
 
-	if exitCode != 0 { os.Exit(exitCode) }
+	if hadErrors {
+		return ErrPartialSync
+	}
 	return nil
+}
+
+// prepTenant fetches spaces and apps for a tenant, using cache when available.
+func prepTenant(ctx context.Context, tenant config.Tenant, filters qsync.Filters) ([]qsync.App, map[string]qsync.SpaceInfo, error) {
+	cwd, _ := os.Getwd()
+	cacheKey := qsync.BuildCacheKey(tenant.Context, filters.Space, filters.Stream, filters.App, cwd)
+	tmpDir := os.TempDir()
+
+	// Try cache (unless --force)
+	if !syncForce {
+		if cached, err := qsync.CacheRead(tmpDir, cacheKey, cacheTTL); err == nil && cached != nil {
+			var prep qsync.PrepOutput
+			if json.Unmarshal(cached, &prep) == nil {
+				spaces := make(map[string]qsync.SpaceInfo)
+				return prep.Apps, spaces, nil
+			}
+		}
+	}
+
+	spacesOut, err := qsync.RunQlikCmd(ctx, "qlik", qsync.BuildSpaceListArgs()...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("fetching spaces: %w", err)
+	}
+	spaces, err := qsync.ParseCloudSpaces(spacesOut)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing spaces: %w", err)
+	}
+
+	spaceID := ""
+	if filters.Space != "" {
+		for _, s := range spaces {
+			if s.Name == filters.Space {
+				spaceID = s.ID
+				break
+			}
+		}
+	}
+
+	appsOut, err := qsync.RunQlikCmd(ctx, "qlik", qsync.BuildAppListArgs(spaceID)...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("fetching apps: %w", err)
+	}
+
+	apps, err := qsync.ParseCloudApps(appsOut, spaces, tenant.Context, "")
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing apps: %w", err)
+	}
+
+	// Write cache
+	prep := qsync.PrepOutput{Tenant: tenant.Context, Context: tenant.Context, Server: tenant.Server, Apps: apps}
+	if data, err := json.Marshal(prep); err == nil {
+		_ = qsync.CacheWrite(tmpDir, cacheKey, data)
+	}
+
+	return apps, spaces, nil
 }

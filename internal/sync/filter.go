@@ -18,15 +18,18 @@ func FilterBySpace(apps []App, space string) []App {
 }
 
 // FilterByApp returns apps whose Name matches the given regex pattern.
-func FilterByApp(apps []App, pattern string) []App {
-	re := regexp.MustCompile(pattern)
+func FilterByApp(apps []App, pattern string) ([]App, error) {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("invalid app filter pattern %q: %w", pattern, err)
+	}
 	result := make([]App, 0, len(apps))
 	for _, a := range apps {
 		if re.MatchString(a.Name) {
 			result = append(result, a)
 		}
 	}
-	return result
+	return result, nil
 }
 
 // FilterByID returns apps whose ResourceID matches the given id exactly.
@@ -41,18 +44,22 @@ func FilterByID(apps []App, id string) []App {
 }
 
 // ApplyFilters chains Space and App filters; if ID is set it short-circuits and returns only ID match.
-func ApplyFilters(apps []App, f Filters) []App {
+func ApplyFilters(apps []App, f Filters) ([]App, error) {
 	if f.ID != "" {
-		return FilterByID(apps, f.ID)
+		return FilterByID(apps, f.ID), nil
 	}
 	result := apps
 	if f.Space != "" {
 		result = FilterBySpace(result, f.Space)
 	}
 	if f.App != "" {
-		result = FilterByApp(result, f.App)
+		var err error
+		result, err = FilterByApp(result, f.App)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return result
+	return result, nil
 }
 
 // Sanitize replaces filesystem-unsafe characters /\:*?"<>| with underscore.
