@@ -3,6 +3,9 @@
 # Resolve real script location even when invoked through a symlink.
 SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")")" && pwd)"
 case "$*" in
+  "version")
+    printf 'version: 3.0.0\tcommit: mock\tdate: 2026-01-01T00:00:00Z'
+    ;;
   "space ls --json")
     cat "$SCRIPT_DIR/testdata/spaces.json"
     ;;
