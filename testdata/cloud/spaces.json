@@ -1,0 +1,4 @@
+[
+  {"id": "space-001", "name": "Finance Prod", "type": "managed"},
+  {"id": "space-002", "name": "HR", "type": "shared"}
+]
