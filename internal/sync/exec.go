@@ -57,9 +57,9 @@ func BuildUnbuildArgs(resourceID, targetDir string) []string {
 	return []string{"app", "unbuild", "--app", resourceID, "--dir", targetDir}
 }
 
-func CloudSyncApp(ctx context.Context, app App, configDir string) error {
+func CloudSyncApp(ctx context.Context, app App, configDir string, qlikBinary string) error {
 	targetDir := fmt.Sprintf("%s/%s", configDir, app.TargetPath)
 	args := BuildUnbuildArgs(app.ResourceID, targetDir)
-	_, err := RunQlikCmd(ctx, "qlik", args...)
+	_, err := RunQlikCmd(ctx, qlikBinary, args...)
 	return err
 }

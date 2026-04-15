@@ -17,12 +17,12 @@ func TestRunParallel(t *testing.T) {
 	}
 
 	var called atomic.Int32
-	syncFn := func(ctx context.Context, app qsync.App, configDir string) error {
+	syncFn := func(ctx context.Context, app qsync.App, configDir string, qlikBinary string) error {
 		called.Add(1)
 		return nil
 	}
 
-	results := qsync.RunParallel(context.Background(), apps, "qlik", 2, 1, syncFn)
+	results := qsync.RunParallel(context.Background(), apps, "testdir", 2, 1, "qlik", syncFn)
 
 	if int(called.Load()) != 2 {
 		t.Errorf("syncFn called %d times, want 2", called.Load())
@@ -50,7 +50,7 @@ func TestRunParallel(t *testing.T) {
 
 func TestRunParallel_Retry(t *testing.T) {
 	var attempts atomic.Int32
-	syncFn := func(ctx context.Context, app qsync.App, configDir string) error {
+	syncFn := func(ctx context.Context, app qsync.App, configDir string, qlikBinary string) error {
 		n := attempts.Add(1)
 		if n < 3 {
 			return errors.New("transient error")
@@ -59,7 +59,7 @@ func TestRunParallel_Retry(t *testing.T) {
 	}
 
 	apps := []qsync.App{{ResourceID: "1", Name: "Flaky", TargetPath: "path/1"}}
-	results := qsync.RunParallel(context.Background(), apps, "qlik", 1, 3, syncFn)
+	results := qsync.RunParallel(context.Background(), apps, "testdir", 1, 3, "qlik", syncFn)
 
 	if results[0].Status != "synced" {
 		t.Errorf("status = %q, want synced", results[0].Status)
@@ -70,12 +70,12 @@ func TestRunParallel_Retry(t *testing.T) {
 }
 
 func TestRunParallel_ExhaustedRetries(t *testing.T) {
-	syncFn := func(ctx context.Context, app qsync.App, configDir string) error {
+	syncFn := func(ctx context.Context, app qsync.App, configDir string, qlikBinary string) error {
 		return errors.New("permanent error")
 	}
 
 	apps := []qsync.App{{ResourceID: "1", Name: "Broken", TargetPath: "path/1"}}
-	results := qsync.RunParallel(context.Background(), apps, "qlik", 1, 2, syncFn)
+	results := qsync.RunParallel(context.Background(), apps, "testdir", 1, 2, "qlik", syncFn)
 
 	if results[0].Status != "error" {
 		t.Errorf("status = %q, want error", results[0].Status)
