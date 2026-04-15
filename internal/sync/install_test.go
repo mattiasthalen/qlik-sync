@@ -43,3 +43,34 @@ func TestBuildChecksumsURL(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
+
+func TestVerifyChecksum(t *testing.T) {
+	data := []byte("hello world")
+	// SHA256 of "hello world"
+	checksumsBody := []byte(
+		"b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9  hello.tar.gz\n" +
+			"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  other.tar.gz\n",
+	)
+
+	t.Run("valid checksum", func(t *testing.T) {
+		err := qsync.VerifyChecksum(data, checksumsBody, "hello.tar.gz")
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("invalid checksum", func(t *testing.T) {
+		bad := []byte("wrong data")
+		err := qsync.VerifyChecksum(bad, checksumsBody, "hello.tar.gz")
+		if err == nil {
+			t.Error("expected error for mismatched checksum")
+		}
+	})
+
+	t.Run("asset not found in checksums", func(t *testing.T) {
+		err := qsync.VerifyChecksum(data, checksumsBody, "missing.tar.gz")
+		if err == nil {
+			t.Error("expected error for missing asset")
+		}
+	})
+}
