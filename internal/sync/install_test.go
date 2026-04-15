@@ -23,6 +23,8 @@ func TestDetectAssetName(t *testing.T) {
 		if name != "qlik-Windows-x86_64.zip" {
 			t.Errorf("got %q, want qlik-Windows-x86_64.zip", name)
 		}
+	default:
+		t.Fatalf("untested GOOS: %s", runtime.GOOS)
 	}
 }
 
