@@ -39,7 +39,6 @@ func TestSyncEndToEnd(t *testing.T) {
 	if err := os.Symlink(mockScript, mockLink); err != nil {
 		t.Fatal(err)
 	}
-	pathDir := binDir
 
 	// Set up working directory with config
 	workDir := t.TempDir()
@@ -59,7 +58,6 @@ func TestSyncEndToEnd(t *testing.T) {
 	// Run qs sync
 	cmd := exec.Command(binPath, "sync")
 	cmd.Dir = workDir
-	cmd.Env = append(os.Environ(), "PATH="+pathDir+":"+os.Getenv("PATH"))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("sync failed: %s\n%s", err, out)
@@ -106,7 +104,6 @@ func TestSyncRejectsIncompatibleVersion(t *testing.T) {
 
 	// Create mock qlik next to qs binary that returns incompatible version
 	binDir := filepath.Dir(binPath)
-	pathDir := binDir
 	mockPath := filepath.Join(binDir, "qlik")
 	mockScript := "#!/bin/sh\nprintf 'version: 2.0.0\\tcommit: mock\\tdate: 2026-01-01T00:00:00Z'\n"
 	if err := os.WriteFile(mockPath, []byte(mockScript), 0755); err != nil {
@@ -131,7 +128,6 @@ func TestSyncRejectsIncompatibleVersion(t *testing.T) {
 	// Run qs sync — should fail due to version mismatch
 	cmd := exec.Command(binPath, "sync")
 	cmd.Dir = workDir
-	cmd.Env = append(os.Environ(), "PATH="+pathDir+":"+os.Getenv("PATH"))
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatal("expected sync to fail with incompatible version, but it succeeded")

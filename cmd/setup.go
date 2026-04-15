@@ -33,10 +33,6 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if err := qsync.CheckPrerequisites(qlikPath, skipVersionCheck); err != nil {
-		return err
-	}
-
 	reader := bufio.NewReader(os.Stdin)
 
 	// List existing contexts
