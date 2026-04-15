@@ -26,19 +26,20 @@ func TestSyncEndToEnd(t *testing.T) {
 		t.Fatalf("build failed: %s\n%s", err, out)
 	}
 
-	// Set up mock qlik in PATH
+	// Set up mock qlik next to the qs binary (ResolveQlikPath looks there)
 	mockDir, _ := filepath.Abs(".")
 	mockScript := filepath.Join(mockDir, "mock-qlik.sh")
 	if err := os.Chmod(mockScript, 0755); err != nil {
 		t.Fatal(err)
 	}
 
-	// Create symlink so mock is found as "qlik"
-	pathDir := t.TempDir()
-	mockLink := filepath.Join(pathDir, "qlik")
+	// Create symlink so mock is found as "qlik" next to qs binary
+	binDir := filepath.Dir(binPath)
+	mockLink := filepath.Join(binDir, "qlik")
 	if err := os.Symlink(mockScript, mockLink); err != nil {
 		t.Fatal(err)
 	}
+	pathDir := binDir
 
 	// Set up working directory with config
 	workDir := t.TempDir()
@@ -103,9 +104,10 @@ func TestSyncRejectsIncompatibleVersion(t *testing.T) {
 		t.Fatalf("build failed: %s\n%s", err, out)
 	}
 
-	// Create mock qlik that returns incompatible version
-	pathDir := t.TempDir()
-	mockPath := filepath.Join(pathDir, "qlik")
+	// Create mock qlik next to qs binary that returns incompatible version
+	binDir := filepath.Dir(binPath)
+	pathDir := binDir
+	mockPath := filepath.Join(binDir, "qlik")
 	mockScript := "#!/bin/sh\nprintf 'version: 2.0.0\\tcommit: mock\\tdate: 2026-01-01T00:00:00Z'\n"
 	if err := os.WriteFile(mockPath, []byte(mockScript), 0755); err != nil {
 		t.Fatal(err)

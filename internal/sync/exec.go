@@ -10,7 +10,7 @@ import (
 
 func CheckPrerequisites(qlikPath string, skipVersionCheck bool) error {
 	if _, err := os.Stat(qlikPath); err != nil {
-		return fmt.Errorf("qlik-cli not found at %s\n\n  Run \"qs setup\" to install it automatically.", qlikPath)
+		return fmt.Errorf("qlik-cli not found at %s\n\n  Run \"qs setup\" to install it automatically", qlikPath)
 	}
 
 	if skipVersionCheck {
@@ -23,7 +23,7 @@ func CheckPrerequisites(qlikPath string, skipVersionCheck bool) error {
 	}
 
 	if err := CheckVersion(strings.TrimSpace(string(out))); err != nil {
-		return fmt.Errorf("%w\n\n  Run \"qs setup\" to install the correct version.", err)
+		return fmt.Errorf("%w\n\n  Run \"qs setup\" to install the correct version", err)
 	}
 
 	return nil
