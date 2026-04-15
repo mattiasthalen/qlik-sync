@@ -5,6 +5,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -119,6 +120,28 @@ func buildZip(t *testing.T, name string, content []byte) []byte {
 		t.Fatal(err)
 	}
 	return buf.Bytes()
+}
+
+func TestResolveQlikPath(t *testing.T) {
+	got, err := qsync.ResolveQlikPath()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should end with /qlik (or \qlik.exe on windows)
+	base := filepath.Base(got)
+	if runtime.GOOS == "windows" {
+		if base != "qlik.exe" {
+			t.Errorf("base = %q, want qlik.exe", base)
+		}
+	} else {
+		if base != "qlik" {
+			t.Errorf("base = %q, want qlik", base)
+		}
+	}
+	// Should be an absolute path
+	if !filepath.IsAbs(got) {
+		t.Errorf("path %q is not absolute", got)
+	}
 }
 
 func TestVerifyChecksum(t *testing.T) {

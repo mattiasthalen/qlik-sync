@@ -10,6 +10,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 )
@@ -79,6 +81,23 @@ func extractFromZip(data []byte) ([]byte, error) {
 		}
 	}
 	return nil, fmt.Errorf("qlik.exe not found in archive")
+}
+
+func ResolveQlikPath() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("cannot determine qs location: %w", err)
+	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		return "", fmt.Errorf("cannot resolve qs symlink: %w", err)
+	}
+	dir := filepath.Dir(exe)
+	name := "qlik"
+	if runtime.GOOS == "windows" {
+		name = "qlik.exe"
+	}
+	return filepath.Join(dir, name), nil
 }
 
 func VerifyChecksum(data, checksumsBody []byte, assetName string) error {
