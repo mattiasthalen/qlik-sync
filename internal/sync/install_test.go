@@ -1,6 +1,10 @@
 package sync_test
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"bytes"
+	"compress/gzip"
 	"runtime"
 	"testing"
 
@@ -42,6 +46,79 @@ func TestBuildChecksumsURL(t *testing.T) {
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
+}
+
+func TestExtractBinary_TarGz(t *testing.T) {
+	content := []byte("fake-qlik-binary")
+	archive := buildTarGz(t, "qlik", content)
+
+	got, err := qsync.ExtractBinary(archive, "linux")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Errorf("got %q, want %q", got, content)
+	}
+}
+
+func TestExtractBinary_Zip(t *testing.T) {
+	content := []byte("fake-qlik-binary")
+	archive := buildZip(t, "qlik.exe", content)
+
+	got, err := qsync.ExtractBinary(archive, "windows")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Errorf("got %q, want %q", got, content)
+	}
+}
+
+func TestExtractBinary_NoBinary(t *testing.T) {
+	archive := buildTarGz(t, "README.md", []byte("not a binary"))
+
+	_, err := qsync.ExtractBinary(archive, "linux")
+	if err == nil {
+		t.Error("expected error for missing qlik binary in archive")
+	}
+}
+
+func buildTarGz(t *testing.T, name string, content []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gw)
+	hdr := &tar.Header{Name: name, Size: int64(len(content)), Mode: 0755}
+	if err := tw.WriteHeader(hdr); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tw.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func buildZip(t *testing.T, name string, content []byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.Create(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
 }
 
 func TestVerifyChecksum(t *testing.T) {
