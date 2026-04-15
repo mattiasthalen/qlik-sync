@@ -7,9 +7,9 @@ import (
 	"time"
 )
 
-type SyncFunc func(ctx context.Context, app App, configDir string) error
+type SyncFunc func(ctx context.Context, app App, configDir string, qlikBinary string) error
 
-func RunParallel(ctx context.Context, apps []App, configDir string, threads, retries int, fn SyncFunc) []Result {
+func RunParallel(ctx context.Context, apps []App, configDir string, threads, retries int, qlikBinary string, fn SyncFunc) []Result {
 	results := make([]Result, len(apps))
 	sem := make(chan struct{}, threads)
 	var wg gosync.WaitGroup
@@ -25,7 +25,7 @@ func RunParallel(ctx context.Context, apps []App, configDir string, threads, ret
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			err := retry(ctx, retries, func() error { return fn(ctx, a, configDir) })
+			err := retry(ctx, retries, func() error { return fn(ctx, a, configDir, qlikBinary) })
 			if err != nil {
 				results[idx] = Result{ResourceID: a.ResourceID, Status: "error", Error: err.Error()}
 			} else {

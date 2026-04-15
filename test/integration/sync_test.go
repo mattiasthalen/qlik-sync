@@ -26,16 +26,16 @@ func TestSyncEndToEnd(t *testing.T) {
 		t.Fatalf("build failed: %s\n%s", err, out)
 	}
 
-	// Set up mock qlik in PATH
+	// Set up mock qlik next to the qs binary (ResolveQlikPath looks there)
 	mockDir, _ := filepath.Abs(".")
 	mockScript := filepath.Join(mockDir, "mock-qlik.sh")
 	if err := os.Chmod(mockScript, 0755); err != nil {
 		t.Fatal(err)
 	}
 
-	// Create symlink so mock is found as "qlik"
-	pathDir := t.TempDir()
-	mockLink := filepath.Join(pathDir, "qlik")
+	// Create symlink so mock is found as "qlik" next to qs binary
+	binDir := filepath.Dir(binPath)
+	mockLink := filepath.Join(binDir, "qlik")
 	if err := os.Symlink(mockScript, mockLink); err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,6 @@ func TestSyncEndToEnd(t *testing.T) {
 	// Run qs sync
 	cmd := exec.Command(binPath, "sync")
 	cmd.Dir = workDir
-	cmd.Env = append(os.Environ(), "PATH="+pathDir+":"+os.Getenv("PATH"))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("sync failed: %s\n%s", err, out)
@@ -103,9 +102,9 @@ func TestSyncRejectsIncompatibleVersion(t *testing.T) {
 		t.Fatalf("build failed: %s\n%s", err, out)
 	}
 
-	// Create mock qlik that returns incompatible version
-	pathDir := t.TempDir()
-	mockPath := filepath.Join(pathDir, "qlik")
+	// Create mock qlik next to qs binary that returns incompatible version
+	binDir := filepath.Dir(binPath)
+	mockPath := filepath.Join(binDir, "qlik")
 	mockScript := "#!/bin/sh\nprintf 'version: 2.0.0\\tcommit: mock\\tdate: 2026-01-01T00:00:00Z'\n"
 	if err := os.WriteFile(mockPath, []byte(mockScript), 0755); err != nil {
 		t.Fatal(err)
@@ -129,7 +128,6 @@ func TestSyncRejectsIncompatibleVersion(t *testing.T) {
 	// Run qs sync — should fail due to version mismatch
 	cmd := exec.Command(binPath, "sync")
 	cmd.Dir = workDir
-	cmd.Env = append(os.Environ(), "PATH="+pathDir+":"+os.Getenv("PATH"))
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		t.Fatal("expected sync to fail with incompatible version, but it succeeded")

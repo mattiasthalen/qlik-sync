@@ -24,14 +24,19 @@ func init() {
 }
 
 func runSetup(cmd *cobra.Command, args []string) error {
-	if err := qsync.CheckPrerequisites(skipVersionCheck); err != nil {
+	qlikPath, err := qsync.ResolveQlikPath()
+	if err != nil {
+		return err
+	}
+
+	if err := qsync.EnsureQlikCLI(cmd.Context(), qlikPath); err != nil {
 		return err
 	}
 
 	reader := bufio.NewReader(os.Stdin)
 
 	// List existing contexts
-	out, err := qsync.RunQlikCmd(cmd.Context(), "qlik", "context", "ls")
+	out, err := qsync.RunQlikCmd(cmd.Context(), qlikPath, "context", "ls")
 	if err == nil {
 		fmt.Printf("Existing qlik contexts:\n%s\n", string(out))
 	}
@@ -48,7 +53,7 @@ func runSetup(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Detected tenant type: %s\n", tenantType)
 
 	// Check if context exists, create if not
-	checkCmd := exec.Command("qlik", "context", "get", contextName)
+	checkCmd := exec.Command(qlikPath, "context", "get", contextName)
 	if err := checkCmd.Run(); err != nil {
 		fmt.Print("Enter API key: ")
 		apiKey, _ := reader.ReadString('\n')
@@ -58,25 +63,25 @@ func runSetup(cmd *cobra.Command, args []string) error {
 		if tenantType == "on-prem" {
 			createArgs = append(createArgs, "--server-type", "Windows", "--insecure")
 		}
-		if _, err := qsync.RunQlikCmd(cmd.Context(), "qlik", createArgs...); err != nil {
+		if _, err := qsync.RunQlikCmd(cmd.Context(), qlikPath, createArgs...); err != nil {
 			return fmt.Errorf("creating context: %w", err)
 		}
 		fmt.Println("Context created.")
 	}
 
 	// Set active context
-	if _, err := qsync.RunQlikCmd(cmd.Context(), "qlik", "context", "use", contextName); err != nil {
+	if _, err := qsync.RunQlikCmd(cmd.Context(), qlikPath, "context", "use", contextName); err != nil {
 		return fmt.Errorf("setting active context: %w", err)
 	}
 
 	// Test connectivity
 	fmt.Println("Testing connectivity...")
 	if tenantType == "cloud" {
-		if _, err := qsync.RunQlikCmd(cmd.Context(), "qlik", "app", "ls", "--limit", "1"); err != nil {
+		if _, err := qsync.RunQlikCmd(cmd.Context(), qlikPath, "app", "ls", "--limit", "1"); err != nil {
 			return fmt.Errorf("connectivity test failed: %w\n  Check your API key and server URL", err)
 		}
 	} else {
-		if _, err := qsync.RunQlikCmd(cmd.Context(), "qlik", "qrs", "app", "count"); err != nil {
+		if _, err := qsync.RunQlikCmd(cmd.Context(), qlikPath, "qrs", "app", "count"); err != nil {
 			return fmt.Errorf("connectivity test failed: %w\n  Check your API key and server URL", err)
 		}
 	}

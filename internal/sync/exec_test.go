@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	qsync "github.com/mattiasthalen/qlik-sync/internal/sync"
@@ -71,15 +72,55 @@ func TestRunQlikCmd(t *testing.T) {
 }
 
 func TestCheckPrerequisites(t *testing.T) {
-	t.Run("skip version check", func(t *testing.T) {
-		err := qsync.CheckPrerequisites(true)
-		_ = err // depends on environment having qlik in PATH
+	t.Run("skip version check with existing binary", func(t *testing.T) {
+		dir := t.TempDir()
+		mockPath := filepath.Join(dir, "qlik")
+		script := "#!/bin/sh\nprintf 'version: 3.0.0\\tcommit: abc\\tdate: 2026-01-01'\n"
+		if err := os.WriteFile(mockPath, []byte(script), 0755); err != nil {
+			t.Fatal(err)
+		}
+		err := qsync.CheckPrerequisites(mockPath, true)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 	})
 
-	t.Run("does not skip version check", func(t *testing.T) {
-		// When not skipping, CheckPrerequisites calls qlik version.
-		// In test env with real qlik installed, should pass.
-		// Just verify function accepts false without panic.
-		_ = qsync.CheckPrerequisites(false)
+	t.Run("missing binary", func(t *testing.T) {
+		err := qsync.CheckPrerequisites("/nonexistent/path/qlik", false)
+		if err == nil {
+			t.Error("expected error for missing binary")
+		}
+		if !strings.Contains(err.Error(), "qs setup") {
+			t.Errorf("error should mention 'qs setup', got: %v", err)
+		}
+	})
+
+	t.Run("incompatible version", func(t *testing.T) {
+		dir := t.TempDir()
+		mockPath := filepath.Join(dir, "qlik")
+		script := "#!/bin/sh\nprintf 'version: 2.0.0\\tcommit: abc\\tdate: 2026-01-01'\n"
+		if err := os.WriteFile(mockPath, []byte(script), 0755); err != nil {
+			t.Fatal(err)
+		}
+		err := qsync.CheckPrerequisites(mockPath, false)
+		if err == nil {
+			t.Error("expected error for incompatible version")
+		}
+		if !strings.Contains(err.Error(), "qs setup") {
+			t.Errorf("error should mention 'qs setup', got: %v", err)
+		}
+	})
+
+	t.Run("compatible version", func(t *testing.T) {
+		dir := t.TempDir()
+		mockPath := filepath.Join(dir, "qlik")
+		script := "#!/bin/sh\nprintf 'version: 3.0.0\\tcommit: abc\\tdate: 2026-01-01'\n"
+		if err := os.WriteFile(mockPath, []byte(script), 0755); err != nil {
+			t.Fatal(err)
+		}
+		err := qsync.CheckPrerequisites(mockPath, false)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 	})
 }
