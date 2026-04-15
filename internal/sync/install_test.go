@@ -5,6 +5,9 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -141,6 +144,34 @@ func TestResolveQlikPath(t *testing.T) {
 	// Should be an absolute path
 	if !filepath.IsAbs(got) {
 		t.Errorf("path %q is not absolute", got)
+	}
+}
+
+func TestDownloadFile(t *testing.T) {
+	content := []byte("file-content")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(content)
+	}))
+	defer srv.Close()
+
+	got, err := qsync.DownloadFile(context.Background(), srv.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Errorf("got %q, want %q", got, content)
+	}
+}
+
+func TestDownloadFile_Error(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	_, err := qsync.DownloadFile(context.Background(), srv.URL)
+	if err == nil {
+		t.Error("expected error for 404 response")
 	}
 }
 

@@ -6,10 +6,12 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -98,6 +100,76 @@ func ResolveQlikPath() (string, error) {
 		name = "qlik.exe"
 	}
 	return filepath.Join(dir, name), nil
+}
+
+func DownloadFile(ctx context.Context, url string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("creating request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("downloading %s: %w", url, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("downloading %s: HTTP %d", url, resp.StatusCode)
+	}
+	return io.ReadAll(resp.Body)
+}
+
+func EnsureQlikCLI(ctx context.Context, targetPath string) error {
+	if _, err := os.Stat(targetPath); err == nil {
+		out, err := RunQlikCmd(ctx, targetPath, "version")
+		if err == nil {
+			if verErr := CheckVersion(strings.TrimSpace(string(out))); verErr == nil {
+				fmt.Printf("qlik-cli found at %s\n", targetPath)
+				return nil
+			}
+		}
+		fmt.Printf("Replacing incompatible qlik-cli at %s\n", targetPath)
+	}
+
+	fmt.Printf("Installing qlik-cli %s to %s\n", QlikCLIVersion, targetPath)
+
+	asset := DetectAssetName()
+	archiveURL := BuildDownloadURL(QlikCLIVersion, asset)
+	checksumsURL := BuildChecksumsURL(QlikCLIVersion)
+
+	archive, err := DownloadFile(ctx, archiveURL)
+	if err != nil {
+		return fmt.Errorf("downloading qlik-cli: %w", err)
+	}
+
+	checksums, err := DownloadFile(ctx, checksumsURL)
+	if err != nil {
+		return fmt.Errorf("downloading checksums: %w", err)
+	}
+
+	if err := VerifyChecksum(archive, checksums, asset); err != nil {
+		return fmt.Errorf("verifying qlik-cli: %w", err)
+	}
+
+	binary, err := ExtractBinary(archive, runtime.GOOS)
+	if err != nil {
+		return fmt.Errorf("extracting qlik-cli: %w", err)
+	}
+
+	if err := os.WriteFile(targetPath, binary, 0755); err != nil {
+		dir := filepath.Dir(targetPath)
+		return fmt.Errorf("cannot install qlik-cli to %s — check permissions or run with sudo", dir)
+	}
+
+	out, err := RunQlikCmd(ctx, targetPath, "version")
+	if err != nil {
+		return fmt.Errorf("verifying installed qlik-cli: %w", err)
+	}
+	if err := CheckVersion(strings.TrimSpace(string(out))); err != nil {
+		return fmt.Errorf("installed qlik-cli version mismatch: %w", err)
+	}
+
+	fmt.Printf("qlik-cli %s installed successfully\n", QlikCLIVersion)
+	return nil
 }
 
 func VerifyChecksum(data, checksumsBody []byte, assetName string) error {
